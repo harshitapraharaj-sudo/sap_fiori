@@ -105,10 +105,30 @@ app.post('/api/employees', async (req, res) => {
 
 app.put('/api/employees/:id', async (req, res) => {
   try {
-    const { name, role, department, email } = req.body;
-    await db.run(`
-      UPDATE employees SET name = ?, role = ?, department = ?, email = ? WHERE id = ?
-    `, [name, role, department, email, req.params.id]);
+    const { name, role, department, email, leaveBalance } = req.body;
+    let result;
+
+    if (leaveBalance) {
+      const annual = leaveBalance.annual !== undefined ? leaveBalance.annual : 20;
+      const sick = leaveBalance.sick !== undefined ? leaveBalance.sick : 10;
+      const casual = leaveBalance.casual !== undefined ? leaveBalance.casual : 5;
+
+      result = await db.run(`
+        UPDATE employees 
+        SET name = ?, role = ?, department = ?, email = ?, annual_bal = ?, sick_bal = ?, casual_bal = ? 
+        WHERE id = ?
+      `, [name, role, department, email, annual, sick, casual, req.params.id]);
+    } else {
+      result = await db.run(`
+        UPDATE employees 
+        SET name = ?, role = ?, department = ?, email = ? 
+        WHERE id = ?
+      `, [name, role, department, email, req.params.id]);
+    }
+
+    if (result.changes === 0) {
+      return res.status(404).json({ status: 'error', message: 'Employee not found' });
+    }
 
     const updated = await db.get("SELECT * FROM employees WHERE id = ?", [req.params.id]);
     res.json({ status: 'success', data: formatEmp(updated) });
@@ -119,7 +139,10 @@ app.put('/api/employees/:id', async (req, res) => {
 
 app.delete('/api/employees/:id', async (req, res) => {
   try {
-    await db.run("DELETE FROM employees WHERE id = ?", [req.params.id]);
+    const result = await db.run("DELETE FROM employees WHERE id = ?", [req.params.id]);
+    if (result.changes === 0) {
+      return res.status(404).json({ status: 'error', message: 'Employee not found' });
+    }
     res.json({ status: 'success', message: 'Employee deleted from SQLite DB' });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
