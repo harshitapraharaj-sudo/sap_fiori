@@ -1,5 +1,5 @@
 /**
- * SAP Fiori Manager Module View Controller with Analytics & CSV Roster Export
+ * SAP Fiori Manager Module View Controller with Instant & Modal Approvals Engine
  */
 
 class ManagerView {
@@ -61,6 +61,31 @@ class ManagerView {
           ${this.renderSubTabContent(subTab, currentManager, teamRequests, pendingRequests, teamEmployees)}
         </div>
       </div>
+
+      <!-- Global Manager Modal Overlay -->
+      <div class="modal-overlay" id="approvalModalOverlay">
+        <div class="fiori-dialog">
+          <div class="fiori-dialog-header">
+            <span class="fiori-dialog-title" id="approvalModalTitle">Process Leave Request</span>
+            <button class="close-btn" onclick="managerView.closeApprovalModal()">&times;</button>
+          </div>
+          <div class="fiori-dialog-body">
+            <input type="hidden" id="modalRequestId" />
+            <input type="hidden" id="modalActionType" />
+
+            <div id="modalReqDetails" style="margin-bottom: 1.25rem; background: var(--sap-bg-main); padding: 1rem; border-radius: 6px; border: 1px solid var(--sap-card-border);"></div>
+
+            <div class="form-group">
+              <label class="form-label">Manager Feedback / Comments</label>
+              <textarea class="fiori-control-input" id="modalCommentInput" rows="3" placeholder="Add optional comments for employee..."></textarea>
+            </div>
+          </div>
+          <div class="fiori-dialog-footer">
+            <button class="fiori-btn fiori-btn-secondary" onclick="managerView.closeApprovalModal()">Cancel</button>
+            <button class="fiori-btn" id="modalSubmitBtn" onclick="managerView.submitApprovalDecision()">Confirm Action</button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -89,7 +114,6 @@ class ManagerView {
     } else if (subTab === 'analytics') {
       return this.renderAnalyticsSection();
     } else {
-      // Default: Approvals queue view
       return this.renderApprovalsQueue(pendingRequests, teamRequests);
     }
   }
@@ -164,10 +188,10 @@ class ManagerView {
                       <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.reason}</td>
                       <td>${r.appliedOn}</td>
                       <td style="text-align: right;">
-                        <button class="fiori-btn fiori-btn-success fiori-btn-sm" onclick="managerView.openApprovalModal('${r.requestId}', 'Approved')">
+                        <button class="fiori-btn fiori-btn-success fiori-btn-sm" onclick="managerView.quickApprove('${r.requestId}')" title="Approve Request">
                           <i class="fas fa-check"></i> Approve
                         </button>
-                        <button class="fiori-btn fiori-btn-danger fiori-btn-sm" onclick="managerView.openApprovalModal('${r.requestId}', 'Rejected')">
+                        <button class="fiori-btn fiori-btn-danger fiori-btn-sm" onclick="managerView.quickReject('${r.requestId}')" title="Reject Request">
                           <i class="fas fa-times"></i> Reject
                         </button>
                       </td>
@@ -210,7 +234,7 @@ class ManagerView {
                     <td>
                       <span class="fiori-status status-${r.status.toLowerCase()}">${r.status}</span>
                     </td>
-                    <td>${r.approvedBy || 'System'} (${r.approvedDate || r.appliedOn})</td>
+                    <td>${r.approvedBy || 'Sarah Jenkins'} (${r.approvedDate || r.appliedOn})</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -218,32 +242,29 @@ class ManagerView {
           </div>
         </div>
       </div>
-
-      <!-- Modal Dialog -->
-      <div class="modal-overlay" id="approvalModalOverlay">
-        <div class="fiori-dialog">
-          <div class="fiori-dialog-header">
-            <span class="fiori-dialog-title" id="approvalModalTitle">Process Leave Request</span>
-            <button class="close-btn" onclick="managerView.closeApprovalModal()">&times;</button>
-          </div>
-          <div class="fiori-dialog-body">
-            <input type="hidden" id="modalRequestId" />
-            <input type="hidden" id="modalActionType" />
-
-            <div id="modalReqDetails" style="margin-bottom: 1.25rem; background: var(--sap-bg-main); padding: 1rem; border-radius: 6px; border: 1px solid var(--sap-card-border);"></div>
-
-            <div class="form-group">
-              <label class="form-label">Manager Feedback / Comments</label>
-              <textarea class="fiori-control-input" id="modalCommentInput" rows="3" placeholder="Add optional comments..."></textarea>
-            </div>
-          </div>
-          <div class="fiori-dialog-footer">
-            <button class="fiori-btn fiori-btn-secondary" onclick="managerView.closeApprovalModal()">Cancel</button>
-            <button class="fiori-btn" id="modalSubmitBtn" onclick="managerView.submitApprovalDecision()">Confirm Action</button>
-          </div>
-        </div>
-      </div>
     `;
+  }
+
+  async quickApprove(requestId) {
+    const currentManager = odataService.getCurrentEmployee();
+    try {
+      await odataService.updateLeaveStatus(requestId, 'Approved', 'Approved by Manager', currentManager.name);
+      appController.showToast(`Request ${requestId} approved successfully!`);
+      this.switchSubTab('approvals');
+    } catch (err) {
+      alert(err.message || 'Error approving request');
+    }
+  }
+
+  async quickReject(requestId) {
+    const currentManager = odataService.getCurrentEmployee();
+    try {
+      await odataService.updateLeaveStatus(requestId, 'Rejected', 'Rejected by Manager', currentManager.name);
+      appController.showToast(`Request ${requestId} rejected.`);
+      this.switchSubTab('approvals');
+    } catch (err) {
+      alert(err.message || 'Error rejecting request');
+    }
   }
 
   openApprovalModal(requestId, actionType) {
@@ -277,26 +298,28 @@ class ManagerView {
       </div>
     `;
 
-    document.getElementById('approvalModalOverlay').classList.add('active');
+    const overlay = document.getElementById('approvalModalOverlay');
+    if (overlay) overlay.classList.add('active');
   }
 
   closeApprovalModal() {
-    document.getElementById('approvalModalOverlay').classList.remove('active');
+    const overlay = document.getElementById('approvalModalOverlay');
+    if (overlay) overlay.classList.remove('active');
   }
 
-  submitApprovalDecision() {
+  async submitApprovalDecision() {
     const requestId = document.getElementById('modalRequestId').value;
     const actionType = document.getElementById('modalActionType').value;
     const comment = document.getElementById('modalCommentInput').value;
     const currentManager = odataService.getCurrentEmployee();
 
     try {
-      odataService.updateLeaveStatus(requestId, actionType, comment, currentManager.name);
+      await odataService.updateLeaveStatus(requestId, actionType, comment, currentManager.name);
       appController.showToast(`Request ${requestId} successfully ${actionType}!`);
       this.closeApprovalModal();
       this.switchSubTab('approvals');
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Error updating approval status');
     }
   }
 
@@ -399,7 +422,6 @@ class ManagerView {
   renderAnalyticsSection() {
     return `
       <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-        <!-- Chart 1: Leave Distribution Donut -->
         <div class="fiori-card">
           <div class="fiori-card-header">
             <span class="fiori-card-title"><i class="fas fa-chart-pie"></i> Leave Distribution by Category</span>
@@ -421,19 +443,16 @@ class ManagerView {
           </div>
         </div>
 
-        <!-- Chart 2: Attendance Monthly Trend Line -->
         <div class="fiori-card">
           <div class="fiori-card-header">
             <span class="fiori-card-title"><i class="fas fa-chart-line"></i> 6-Month Team Attendance Trend (%)</span>
           </div>
           <div class="fiori-card-body">
             <svg width="100%" height="200" viewBox="0 0 500 180" style="overflow: visible;">
-              <!-- Grid lines -->
               <line x1="40" y1="20" x2="480" y2="20" stroke="#e2e8f0" stroke-dasharray="4" />
               <line x1="40" y1="70" x2="480" y2="70" stroke="#e2e8f0" stroke-dasharray="4" />
               <line x1="40" y1="120" x2="480" y2="120" stroke="#e2e8f0" stroke-dasharray="4" />
 
-              <!-- Trend Polyline -->
               <polyline fill="none" stroke="#0a6ed1" stroke-width="4" points="
                 60,90
                 140,50
@@ -443,11 +462,9 @@ class ManagerView {
                 460,25
               " />
 
-              <!-- Target Line 95% -->
               <line x1="40" y1="50" x2="480" y2="50" stroke="#ef4444" stroke-width="2" stroke-dasharray="6" />
               <text x="410" y="45" fill="#ef4444" font-size="10" font-weight="700">Target (95%)</text>
 
-              <!-- Month Labels -->
               <text x="55" y="150" font-size="12" fill="#64748b">Mar</text>
               <text x="135" y="150" font-size="12" fill="#64748b">Apr</text>
               <text x="215" y="150" font-size="12" fill="#64748b">May</text>
