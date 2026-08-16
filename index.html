@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAP Fiori - Employee Leave & Attendance Management System</title>
+  <meta name="description" content="SAP Fiori enterprise web application for automated employee leave tracking, manager approvals, attendance monitoring, and administrative CRUD operations." />
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- SAP Fiori Horizon Theme Styles -->
+  <link rel="stylesheet" href="css/fiori-horizon.css" />
+</head>
+<body>
+
+  <div class="fiori-shell">
+    <!-- Shell Header Container (Rendered by ShellView) -->
+    <div id="shellContainer"></div>
+
+    <!-- Main Content Body (Rendered dynamically by active role view) -->
+    <main class="fiori-content-container" id="mainContentContainer">
+      <div style="text-align: center; padding: 4rem;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--sap-brand-blue);"></i>
+        <p style="margin-top: 1rem; color: var(--sap-text-secondary);">Initializing SAP Fiori Application Framework...</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Application Models and Controllers -->
+  <script src="js/models/mockData.js"></script>
+  <script src="js/models/odataService.js"></script>
+  <script src="js/views/ShellView.js"></script>
+  <script src="js/views/EmployeeView.js"></script>
+  <script src="js/views/ManagerView.js"></script>
+  <script src="js/views/AdminView.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
